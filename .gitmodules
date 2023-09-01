@@ -1,0 +1,6 @@
+[submodule "readium-lcp-server"]
+	path = readium-lcp-server
+	url = https://github.com/drndos/readium-lcp-server.git
+[submodule "pubstore"]
+	path = pubstore
+	url = https://github.com/drndos/pubstore.git

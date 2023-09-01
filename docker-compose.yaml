@@ -1,0 +1,150 @@
+version: "3.7"
+services:
+#  lcp-mysql:
+#    container_name: lcp-mysql
+#    image: mysql:5.7
+#    restart: unless-stopped
+#    environment:
+#      MYSQL_ROOT_PASSWORD: admin
+#      MYSQL_DATABASE: readium
+  lcpserver:
+    build: 
+      context: readium-lcp-server
+      dockerfile: docker/lcpserver/Dockerfile
+    restart: on-failure
+    environment:
+      LCP_PORT: 8081
+      LCP_HOST: 192.168.1.120
+      LSD_BASE_URL: http://192.168.1.120:8082
+      LSD_NOTIFY_AUTH_USER: adm_username
+      LSD_NOTIFY_AUTH_PASS: adm_password
+      READONLY_BOOL: false
+      LCP_BASE_URL: http://192.168.1.120:8081
+      PROFILE: basic
+      AUTH_FILE: /htpasswd
+      CERTIFICATE_PATH: /cert.pem
+      PRIVATE_KEY: /privkey.pem
+      S3_ENDPOINTS: https://192.168.1.120
+      S3_ACCESS_ID: minio
+      S3_DISABLE_SSL_BOOL: true
+      S3_SECRET: password
+      S3_BUCKET: readium
+      S3_TOKEN: ""
+      S3_REGION: "us-east-1"
+      
+#      DB_URI: "mysql://root:admin@tcp(lcp-mysql:3306)/readium?parseTime=true"
+    volumes:
+      - ./readium-lcp-server/test/htpasswd:/htpasswd
+      - ./readium-lcp-server/test/cert/cert-edrlab-test.pem:/cert.pem
+      - ./readium-lcp-server/test/cert/privkey-edrlab-test.pem:/privkey.pem
+    ports:
+      - 8081:8081
+  lsdserver:
+    build: 
+      context: readium-lcp-server
+      dockerfile: docker/lsdserver/Dockerfile
+    restart: on-failure
+    environment:
+      LSD_PORT: 8082
+      LSD_HOST: 192.168.1.120
+      LCP_BASE_URL: http://192.168.1.120:8081
+      LCP_UPDATE_AUTH_USER: adm_username
+      LCP_UPDATE_AUTH_PASS: adm_password
+      READONLY_BOOL: false
+      LSD_BASE_URL: http://192.168.1.120:8082
+      AUTH_FILE: /htpasswd
+#      CERTIFICATE_PATH: /cert.pem
+#      PRIVATE_KEY: /privkey.pem
+#      DB_URI: "mysql://root:admin@tcp(lcp-mysql:3306)/readium?parseTime=true"
+    volumes:
+      - ./readium-lcp-server/test/htpasswd:/htpasswd
+#      - ./readium-lcp-server/test/cert/cert-edrlab-test.pem:/cert.pem
+#      - ./readium-lcp-server/test/cert/privkey-edrlab-test.pem:/privkey.pem
+    ports:
+      - 8082:8082
+  frontend:
+    build: 
+      context: readium-lcp-server
+      dockerfile: docker/frontend/Dockerfile
+    restart: on-failure
+    environment:
+      FRONTEND_PORT: 8083
+      FRONTEND_HOST: 192.168.1.120
+      READONLY_BOOL: false
+      FRONTEND_BASE_URL: http://192.168.1.120:8083
+      FRONTEND_DATABASE: sqlite3://file:/lcp/db/frontend.sqlite?cache=shared&mode=rwc
+      LCP_BASE_URL: http://192.168.1.120:8081
+      LCP_UPDATE_AUTH_USER: adm_username
+      LCP_UPDATE_AUTH_PASS: adm_password
+      MASTER_REPOSITORY: "s3:us-east-1:readium"
+      ENCRYPTED_REPOSITORY: "s3:us-east-1:readium-encrypted"
+      S3_ENDPOINTS: http://192.168.1.120:9000
+      S3_ACCESS_ID: minio
+      S3_DISABLE_SSL_BOOL: true
+      S3_SECRET: password
+      S3_BUCKET: readium
+      S3_TOKEN: ""
+      S3_REGION: "us-east-1"
+      S3_PATH_STYLE: true
+      LSD_BASE_URL: http://192.168.1.120:8082
+      LSD_NOTIFY_AUTH_USER: adm_username
+      LSD_NOTIFY_AUTH_PASS: adm_password
+      PROVIDER_URI: http://sampleprovider.ardevop.sk/
+#      AUTH_FILE: /htpasswd
+#      CERTIFICATE_PATH: /cert.pem
+#      PRIVATE_KEY: /privkey.pem
+#      DB_URI: "mysql://root:admin@tcp(lcp-mysql:3306)/readium?parseTime=true"
+#    volumes:
+#      - ./readium-lcp-server/test/htpasswd:/htpasswd
+#      - ./readium-lcp-server/test/cert/cert-edrlab-test.pem:/cert.pem
+#      - ./readium-lcp-server/test/cert/privkey-edrlab-test.pem:/privkey.pem
+    ports:
+      - 8083:8083
+  pubstore:
+    build: pubstore/
+    restart: on-failure
+    ports:
+      - 8080:8080
+    environment: # You can use this section to set environment variables. But you can also use the .env file.
+      DSN: host=postgres user=postgres password=mysecretpassword dbname=postgres port=5432 sslmode=disable
+      LCP_SERVER_URL: http://192.168.1.120:8081
+      BASE_URL: http://192.168.1.120:8080
+  postgres:
+    image: postgres
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: mysecretpassword    
+  mysql:
+    container_name: some-mysql
+    image: mysql:5.7
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: admin
+      MYSQL_DATABASE: prestashop
+  prestashop:
+    container_name: prestashop
+    image: prestashop/prestashop:latest
+    restart: unless-stopped
+    depends_on:
+      - mysql
+    ports:
+      - 80:80
+    environment:
+      DB_SERVER: some-mysql
+      DB_NAME: prestashop
+      DB_USER: root
+      DB_PASSWD: admin
+  minio:
+    image: minio/minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_storage:/data
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: password
+    command: server --console-address ":9001" /data
+
+volumes:
+  minio_storage: {}
